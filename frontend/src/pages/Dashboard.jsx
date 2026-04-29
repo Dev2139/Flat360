@@ -84,7 +84,7 @@ const Dashboard = () => {
 
   // Generate QR URL for the visitor entry form
   const getQrValue = (flat) => {
-    const origin = window.location.origin;
+    const origin = 'https://flat360.netlify.app';
     return `${origin}/visitor/entry?qrCodeId=${flat.qrCodeId}`;
   };
 
