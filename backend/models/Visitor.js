@@ -27,7 +27,7 @@ const visitorSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['inside', 'left'],
+    enum: ['inside', 'checkout_requested', 'left'],
     default: 'inside'
   }
 }, { timestamps: true });

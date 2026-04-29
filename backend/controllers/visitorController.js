@@ -45,6 +45,43 @@ exports.visitorEntry = async (req, res) => {
   }
 };
 
+// @desc    Request visitor exit
+// @route   PUT /api/visitor/request-exit/:id
+// @access  Public
+exports.requestExit = async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (visitor) {
+      if (visitor.status === 'left') {
+        return res.status(400).json({ message: 'Visitor has already left' });
+      }
+      visitor.status = 'checkout_requested';
+      await visitor.save();
+      res.json(visitor);
+    } else {
+      res.status(404).json({ message: 'Visitor not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get visitor status
+// @route   GET /api/visitor/status/:id
+// @access  Public
+exports.getVisitorStatus = async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (visitor) {
+      res.json({ status: visitor.status });
+    } else {
+      res.status(404).json({ message: 'Visitor not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Register visitor exit
 // @route   PUT /api/visitor/exit/:id
 // @access  Private

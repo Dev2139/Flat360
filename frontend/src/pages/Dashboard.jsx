@@ -23,13 +23,11 @@ const Dashboard = () => {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       const flatsData = await getFlats();
       setFlats(flatsData);
       
-      // Fetch all logs to filter active visitors
       const logs = await getVisitorLogs();
-      const active = logs.filter(log => log.status === 'inside');
+      const active = logs.filter(log => log.status === 'inside' || log.status === 'checkout_requested');
       setActiveVisitors(active);
     } catch (err) {
       setError(err.message || 'Failed to fetch data');
@@ -40,10 +38,32 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-    // Poll for updates every 10 seconds
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 5000); // Poll faster for checkout alerts
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const requestedCheckout = activeVisitors.filter(v => v.status === 'checkout_requested');
+    if (requestedCheckout.length > 0) {
+      try {
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = context.createOscillator();
+        const gainNode = context.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.value = 600; 
+        gainNode.gain.value = 0.1; 
+        
+        osc.connect(gainNode);
+        gainNode.connect(context.destination);
+        
+        osc.start();
+        setTimeout(() => osc.stop(), 500);
+      } catch (e) {
+        console.error('Audio alert failed:', e);
+      }
+    }
+  }, [activeVisitors]);
 
   const handleExit = async (visitorId) => {
     try {
@@ -128,26 +148,47 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeVisitors.map(visitor => (
-              <div key={visitor._id} className="glass-card rounded-2xl p-4 border border-amber-500/30 bg-amber-500/5 flex justify-between items-center">
-                <div>
-                  <p className="font-semibold text-slate-100">{visitor.visitorName}</p>
-                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                    <User className="h-3 w-3" /> Flat {visitor.flatId?.flatNumber} ({visitor.flatId?.ownerName})
-                  </p>
-                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                    <Clock className="h-3 w-3" /> In: {new Date(visitor.entryTime).toLocaleTimeString()}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleExit(visitor._id)}
-                  className="flex items-center space-x-1 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 px-3 py-2 rounded-xl border border-slate-700 hover:border-red-500/30 transition-all duration-300 text-xs font-semibold"
+            {activeVisitors.map(visitor => {
+              const isCheckoutRequested = visitor.status === 'checkout_requested';
+              return (
+                <div 
+                  key={visitor._id} 
+                  className={`glass-card rounded-2xl p-4 flex justify-between items-center transition-all duration-300 ${
+                    isCheckoutRequested 
+                      ? 'border-rose-500 bg-rose-500/20 animate-pulse shadow-lg shadow-rose-500/20' 
+                      : 'border-amber-500/30 bg-amber-500/5'
+                  }`}
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>Leave</span>
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-slate-100">{visitor.visitorName}</p>
+                      {isCheckoutRequested && (
+                        <span className="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold animate-bounce">
+                          EXIT REQUEST
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                      <User className="h-3 w-3" /> Flat {visitor.flatId?.flatNumber} ({visitor.flatId?.ownerName})
+                    </p>
+                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                      <Clock className="h-3 w-3" /> In: {new Date(visitor.entryTime).toLocaleTimeString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleExit(visitor._id)}
+                    className={`flex items-center space-x-1 px-3 py-2 rounded-xl border transition-all duration-300 text-xs font-semibold ${
+                      isCheckoutRequested
+                        ? 'bg-rose-500 hover:bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-500/20'
+                        : 'bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border-slate-700 hover:border-red-500/30'
+                    }`}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Leave</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

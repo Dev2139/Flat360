@@ -99,6 +99,23 @@ export const registerEntry = async (visitorData) => {
   return data;
 };
 
+export const requestExit = async (id) => {
+  const response = await fetch(`${API_URL}/visitor/request-exit/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Failed to request checkout');
+  return data;
+};
+
+export const getVisitorStatus = async (id) => {
+  const response = await fetch(`${API_URL}/visitor/status/${id}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Failed to fetch status');
+  return data;
+};
+
 export const registerExit = async (id) => {
   const response = await fetch(`${API_URL}/visitor/exit/${id}`, {
     method: 'PUT',

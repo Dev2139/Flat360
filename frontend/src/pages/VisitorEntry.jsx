@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getFlatByQr, registerEntry, getFlats, registerExit } from '../services/api';
+import { getFlatByQr, registerEntry, getFlats, requestExit, getVisitorStatus } from '../services/api';
 import confetti from 'canvas-confetti';
-import { ShieldCheck, User, Phone, MessageSquare, Building2, CheckCircle, LogOut } from 'lucide-react';
+import { ShieldCheck, User, Phone, MessageSquare, Building2, CheckCircle, LogOut, Loader2 } from 'lucide-react';
 
 const VisitorEntry = () => {
   const [searchParams] = useSearchParams();
@@ -11,7 +11,7 @@ const VisitorEntry = () => {
 
   // State
   const [flat, setFlat] = useState(null);
-  const [flats, setFlats] = useState([]); // For manual selection if no QR
+  const [flats, setFlats] = useState([]); 
   const [selectedFlatId, setSelectedFlatId] = useState('');
   
   const [visitorName, setVisitorName] = useState('');
@@ -22,6 +22,7 @@ const VisitorEntry = () => {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [createdVisitorId, setCreatedVisitorId] = useState(null);
+  const [checkoutPending, setCheckoutPending] = useState(false);
   const [leftSuccess, setLeftSuccess] = useState(false);
   const [exitLoading, setExitLoading] = useState(false);
   const [error, setError] = useState('');
@@ -45,6 +46,32 @@ const VisitorEntry = () => {
     };
     init();
   }, [qrCodeId]);
+
+  // Polling for Admin Approval of Exit
+  useEffect(() => {
+    if (!checkoutPending || !createdVisitorId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const data = await getVisitorStatus(createdVisitorId);
+        if (data.status === 'left') {
+          setLeftSuccess(true);
+          setCheckoutPending(false);
+          setExitLoading(false);
+          clearInterval(interval);
+          confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.8 }
+          });
+        }
+      } catch (err) {
+        console.error('Error checking status:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [checkoutPending, createdVisitorId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,16 +107,10 @@ const VisitorEntry = () => {
     setExitLoading(true);
     setError('');
     try {
-      await registerExit(createdVisitorId);
-      setLeftSuccess(true);
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.8 }
-      });
+      await requestExit(createdVisitorId);
+      setCheckoutPending(true);
     } catch (err) {
-      setError(err.message || 'Failed to register exit');
-    } finally {
+      setError(err.message || 'Failed to request checkout');
       setExitLoading(false);
     }
   };
@@ -131,15 +152,25 @@ const VisitorEntry = () => {
           </p>
           
           <div className="pt-4 border-t border-slate-800/50">
-            <button
-              onClick={handleLeave}
-              disabled={exitLoading}
-              className="w-full flex items-center justify-center gap-2 bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white font-semibold py-3 px-4 rounded-xl border border-rose-500/30 hover:border-rose-500 transition-all duration-300 disabled:opacity-50"
-            >
-              <LogOut className="h-5 w-5" />
-              {exitLoading ? 'Logging Departure...' : 'I am Leaving Now'}
-            </button>
-            <p className="text-xs text-slate-500 mt-2">Tap above when leaving the gate.</p>
+            {checkoutPending ? (
+              <div className="flex flex-col items-center space-y-3 text-amber-400">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p className="font-semibold">Waiting for Security Approval...</p>
+                <p className="text-xs text-slate-400">Please wait at the gate while the guard verifies.</p>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={handleLeave}
+                  disabled={exitLoading}
+                  className="w-full flex items-center justify-center gap-2 bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white font-semibold py-3 px-4 rounded-xl border border-rose-500/30 hover:border-rose-500 transition-all duration-300 disabled:opacity-50"
+                >
+                  <LogOut className="h-5 w-5" />
+                  {exitLoading ? 'Requesting Exit...' : 'I am Leaving Now'}
+                </button>
+                <p className="text-xs text-slate-500 mt-2">Tap above when leaving the gate.</p>
+              </>
+            )}
           </div>
         </div>
       </div>
