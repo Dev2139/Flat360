@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getFlatByQr, registerEntry, getFlats } from '../services/api';
+import { getFlatByQr, registerEntry, getFlats, registerExit } from '../services/api';
 import confetti from 'canvas-confetti';
-import { ShieldCheck, User, Phone, MessageSquare, Building2, CheckCircle } from 'lucide-react';
+import { ShieldCheck, User, Phone, MessageSquare, Building2, CheckCircle, LogOut } from 'lucide-react';
 
 const VisitorEntry = () => {
   const [searchParams] = useSearchParams();
@@ -21,6 +21,9 @@ const VisitorEntry = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [createdVisitorId, setCreatedVisitorId] = useState(null);
+  const [leftSuccess, setLeftSuccess] = useState(false);
+  const [exitLoading, setExitLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -31,7 +34,6 @@ const VisitorEntry = () => {
           const flatData = await getFlatByQr(qrCodeId);
           setFlat(flatData);
         } else {
-          // Fetch all flats for manual selection
           const flatsData = await getFlats().catch(() => []);
           setFlats(flatsData);
         }
@@ -58,9 +60,9 @@ const VisitorEntry = () => {
         qrCodeId: flat ? qrCodeId : undefined
       };
 
-      await registerEntry(payload);
+      const data = await registerEntry(payload);
+      setCreatedVisitorId(data._id);
       
-      // Success Animation
       setSuccess(true);
       confetti({
         particleCount: 100,
@@ -74,6 +76,24 @@ const VisitorEntry = () => {
     }
   };
 
+  const handleLeave = async () => {
+    setExitLoading(true);
+    setError('');
+    try {
+      await registerExit(createdVisitorId);
+      setLeftSuccess(true);
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.8 }
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to register exit');
+    } finally {
+      setExitLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center text-slate-400">
@@ -82,18 +102,45 @@ const VisitorEntry = () => {
     );
   }
 
-  if (success) {
+  if (leftSuccess) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="glass-card w-full max-w-md p-8 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 text-center space-y-6">
+        <div className="glass-card w-full max-w-md p-8 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 text-center space-y-6 animate-in fade-in duration-500">
           <div className="p-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 inline-block mx-auto">
             <CheckCircle className="h-16 w-16 text-emerald-400" />
           </div>
-          <h2 className="text-3xl font-bold text-slate-100">Entry Registered!</h2>
+          <h2 className="text-3xl font-bold text-slate-100">Departure Logged!</h2>
           <p className="text-slate-300">
+            Thank you for visiting. Have a safe journey!
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="glass-card w-full max-w-md p-8 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 text-center space-y-6 animate-in fade-in duration-500">
+          <div className="p-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 inline-block mx-auto">
+            <CheckCircle className="h-16 w-16 text-emerald-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-100">Entry Registered!</h2>
+          <p className="text-slate-300 text-sm">
             Welcome to our society. The owner of Flat <span className="font-bold text-sky-400">{flat ? flat.flatNumber : flats.find(f => f._id === selectedFlatId)?.flatNumber}</span> has been notified of your arrival.
           </p>
-          <p className="text-sm text-slate-400">Have a great time!</p>
+          
+          <div className="pt-4 border-t border-slate-800/50">
+            <button
+              onClick={handleLeave}
+              disabled={exitLoading}
+              className="w-full flex items-center justify-center gap-2 bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white font-semibold py-3 px-4 rounded-xl border border-rose-500/30 hover:border-rose-500 transition-all duration-300 disabled:opacity-50"
+            >
+              <LogOut className="h-5 w-5" />
+              {exitLoading ? 'Logging Departure...' : 'I am Leaving Now'}
+            </button>
+            <p className="text-xs text-slate-500 mt-2">Tap above when leaving the gate.</p>
+          </div>
         </div>
       </div>
     );
