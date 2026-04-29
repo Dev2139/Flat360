@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://flat360.onrender.com/api';
 
 // Helper to get token from localStorage
 const getAuthHeader = () => {
